@@ -1,7 +1,9 @@
 
-#include "SPI.h"
-#include "Adafruit_GFX.h"
-#include "Adafruit_ILI9341.h"
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_I2CDevice.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ILI9341.h>
 
 #define TFT_DC  9
 #define TFT_CS  10
@@ -22,7 +24,7 @@ const char SEND_OK[] = "SEND OK";
 
 /*---Buffer and Index to process response from ESP8266 Module---*/
 uint8_t buff_idx = 0;
-uint8_t buff[30u] = { 0 };
+uint8_t buff[50u] = { 0 };
 /*---Separate Buffer to Process the GET Response which contains weather data--*/
 uint16_t weather_idx = 0u;
 char weather_buff[700u] = { 0 };
@@ -99,15 +101,18 @@ void setup()
   tft.begin();
   delay(100);
   tft.setRotation(1);
-  tft.setCursor(0,0);
   tft.fillScreen(ILI9341_BLACK);
-  tft.setTextColor(ILI9341_GREEN);
+  tft.setTextColor(ILI9341_RED);
   tft.setTextSize(3);
-  tft.println("EMBEDDED         ");
+  tft.setCursor(10,10);
+  tft.println(" EMBEDDED        ");
+  tft.setTextColor(ILI9341_NAVY);
+  tft.setCursor(0,34);
   tft.println("       LABORATORY");
   tft.setTextSize(2);
-  tft.setCursor(0,54);
+  tft.setCursor(0, 72);
   tft.setTextColor(ILI9341_YELLOW);
+  tft.setTextColor(ILI9341_GREEN);
   tft.println("     OPEN WEATHER API     ");
   tft.println("     Weather  Station     ");
 
@@ -147,48 +152,67 @@ void setup()
   }
   progress_bar(100);
   tft.setTextSize(2);
-  snprintf( tft_buff_s, TFT_TXT_LEN, "IP:%s", (char*)IP_ADDRESS);
-  tft.setCursor(0,200);
+  tft.setTextColor(ILI9341_WHITE);
+  snprintf( tft_buff_s, TFT_TXT_LEN, " IP:  %s", (char*)IP_ADDRESS);
+  tft.setCursor(0,168);
   tft.print( tft_buff_s);
-  snprintf( tft_buff_s, TFT_TXT_LEN, "MAC:%s", (char*)MAC_ADDRESS);
-  tft.setCursor(0,216);
+  snprintf( tft_buff_s, TFT_TXT_LEN, " MAC: %s", (char*)MAC_ADDRESS);
+  tft.setCursor(0,184);
   tft.print( tft_buff_s);
-  delay(100);
-  while(1);
+  delay(1000);
+  tft.fillScreen(ILI9341_BLACK);
 }
 
 
 void loop(void)
 {
-  // TODO
-}
-
-
-unsigned long testText() {
-  tft.fillScreen(ILI9341_BLACK);
-  unsigned long start = micros();
-  tft.setCursor(0, 0);
-  tft.setTextColor(ILI9341_WHITE);  tft.setTextSize(1);
-  tft.println("Hello World!");
-  tft.setTextColor(ILI9341_YELLOW); tft.setTextSize(2);
-  tft.println(1234.56);
-  tft.setTextColor(ILI9341_RED);    tft.setTextSize(3);
-  tft.println(0xDEADBEEF, HEX);
-  tft.println();
-  tft.setTextColor(ILI9341_GREEN);
-  tft.setTextSize(5);
-  tft.println("Groop");
-  tft.setTextSize(2);
-  tft.println("I implore thee,");
-  tft.setTextSize(1);
-  tft.println("my foonting turlingdromes.");
-  tft.println("And hooptiously drangle me");
-  tft.println("with crinkly bindlewurdles,");
-  tft.println("Or I will rend thee");
-  tft.println("in the gobberwarts");
-  tft.println("with my blurglecruncheon,");
-  tft.println("see if I don't!");
-  return micros() - start;
+  uint8_t idx = 0;
+  for( idx=0u; idx<NUM_OF_CITIES; idx++)
+  {
+    /*--Connect the Open Weather Map--*/
+    while( !send_connect_cmd( 2000 ) )
+    {
+      tft.fillScreen(ILI9341_BLACK);
+      tft.setCursor(0,231);
+      tft.setTextSize(1);
+      tft.setTextColor(ILI9341_WHITE);
+      tft.println("Connection Status: FAIL   ");
+    }
+    tft.setCursor(0,231);
+    tft.setTextSize(1);
+    tft.setTextColor(ILI9341_WHITE);
+    tft.println("Connection Status: PASS   ");
+    
+    tft.setTextSize(2);
+    tft.setCursor(8,8);
+    tft.setTextColor(ILI9341_NAVY);
+    delay(500);
+    /*--Connection is OK, send Number of Bytes to Send--*/
+    while( !send_num_of_bytes( s_city_info[idx].len, 3000) )
+    {
+    }
+    delay(500);
+    /*--Send GET Request and Receive Data--*/
+    if( send_get_req( s_city_info[idx].city_name, 5000u ) == true )
+    {
+      tft.println("City Name:" + s_city_info[idx].city_name);
+      
+      tft.setCursor(8,40);
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Temp:%s C", (char*)s_Weather_Data.temp_normal);
+      tft.setCursor(8,56);
+      tft.println( tft_buff_s );
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Real Feel:%s C", (char*)s_Weather_Data.temp_real_feel);
+      tft.setCursor(8,72);
+      tft.println( tft_buff_s );
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Min.Temp:%s C", (char*)s_Weather_Data.temp_minimum);
+      tft.setCursor(8,88);
+      tft.println( tft_buff_s );
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Max.Temp:%s C", (char*)s_Weather_Data.temp_maximum);
+      tft.setCursor(8,104);
+      tft.println( tft_buff_s );
+    }
+    delay(2000);
+  }
 }
 
 /*-----------------------------FUNCTION DEFINITIONS---------------------------*/
@@ -819,16 +843,14 @@ void flush_serial_data( void )
  * 
  * This function flushes the Serial Data from the internal buffers
  */
+const uint16_t p_x = 0;
+const uint16_t p_y = 221;
+const uint16_t p_w = 320;
+const uint16_t p_h = 16;
 void progress_bar( uint8_t percentage )
 {
-  uint8_t idx = 0;
-  percentage = TFT_TXT_LEN * 100/percentage;
-  tft.setTextSize(1);
-  tft.setTextColor(ILI9341_RED);
-  tft.setCursor(0,232);
-  tft.setTextColor(ILI9341_RED);
-  for( idx=0; idx<percentage; idx++ )
-  {
-    tft.write(0xFF);
-  }
+  uint16_t progress = 0;
+  progress = (uint16_t)((320 * (uint16_t)percentage)/100);
+  tft.drawRect(p_x, p_y, p_w, p_h, ILI9341_CYAN);
+  tft.fillRect(p_x, p_y, progress, p_h, ILI9341_DARKCYAN);
 }
