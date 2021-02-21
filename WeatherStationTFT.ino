@@ -22,10 +22,10 @@ const char SEND_OK[] = "SEND OK";
 
 /*---Buffer and Index to process response from ESP8266 Module---*/
 uint8_t buff_idx = 0;
-uint8_t buff[50u] = { 0 };
+uint8_t buff[30u] = { 0 };
 /*---Separate Buffer to Process the GET Response which contains weather data--*/
 uint16_t weather_idx = 0u;
-char weather_buff[1000u] = { 0 };
+char weather_buff[700u] = { 0 };
 
 uint8_t IP_ADDRESS[17u] = { 0 };    /*--Store IP Address--*/
 uint8_t MAC_ADDRESS[18u] = { 0 };   /*--Store MAC Address--*/
@@ -87,6 +87,8 @@ uint8_t check_get_req( uint32_t timeout );
 
 void flush_serial_data( void );
 void flush_buffer( void );
+void progress_bar( uint8_t percentage );
+
 
 void setup() 
 {
@@ -100,12 +102,59 @@ void setup()
   tft.setCursor(0,0);
   tft.fillScreen(ILI9341_BLACK);
   tft.setTextColor(ILI9341_GREEN);
+  tft.setTextSize(3);
+  tft.println("EMBEDDED         ");
+  tft.println("       LABORATORY");
   tft.setTextSize(2);
-  tft.println("EMBEDDED LABORATORY1234567");
+  tft.setCursor(0,54);
   tft.setTextColor(ILI9341_YELLOW);
-  tft.println("OPEN WEATHER API");
-  tft.setTextColor(ILI9341_RED);
-  tft.println("Weather Station");
+  tft.println("     OPEN WEATHER API     ");
+  tft.println("     Weather  Station     ");
+
+  /*--Send ECHO Off Command--*/
+  send_echo_off();
+  progress_bar(10);
+  /*--Check if module is responding with OK response--*/
+  while ( !send_at(2000) )
+  {
+    delay(1000);
+  }
+  progress_bar(30);
+
+  delay(500);
+  /*--Set module in Station Mode--*/
+  while( !send_mode(1,2000) )
+  {
+    /*--if control comes here, this means problem in setting mode--*/
+    delay(500);
+  }
+  progress_bar(60);
+
+  delay(500);
+  /*--Join with Access Points--*/
+  while( !send_join_ap(ssid, pswd, 6000) )
+  {
+    /*--unable to connect, so retry once again--*/
+    delay(500);
+  }
+  progress_bar(80);
+  
+  /*--Get IP Address and MAC Address from the Module--*/
+  while( !get_ip_mac_address( IP_ADDRESS, MAC_ADDRESS, 2000) )
+  {
+    /*--unable to get, try again--*/
+    delay(500);
+  }
+  progress_bar(100);
+  tft.setTextSize(2);
+  snprintf( tft_buff_s, TFT_TXT_LEN, "IP:%s", (char*)IP_ADDRESS);
+  tft.setCursor(0,200);
+  tft.print( tft_buff_s);
+  snprintf( tft_buff_s, TFT_TXT_LEN, "MAC:%s", (char*)MAC_ADDRESS);
+  tft.setCursor(0,216);
+  tft.print( tft_buff_s);
+  delay(100);
+  while(1);
 }
 
 
@@ -762,5 +811,24 @@ void flush_serial_data( void )
   while( Serial.available() > 0 )
   {
     temp = Serial.read();
+  }
+}
+
+/**
+ * @brief Display Progress Bar at Bottom
+ * 
+ * This function flushes the Serial Data from the internal buffers
+ */
+void progress_bar( uint8_t percentage )
+{
+  uint8_t idx = 0;
+  percentage = TFT_TXT_LEN * 100/percentage;
+  tft.setTextSize(1);
+  tft.setTextColor(ILI9341_RED);
+  tft.setCursor(0,232);
+  tft.setTextColor(ILI9341_RED);
+  for( idx=0; idx<percentage; idx++ )
+  {
+    tft.write(0xFF);
   }
 }
