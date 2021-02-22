@@ -33,7 +33,7 @@ uint8_t IP_ADDRESS[17u] = { 0 };    /*--Store IP Address--*/
 uint8_t MAC_ADDRESS[18u] = { 0 };   /*--Store MAC Address--*/
 
 #define NUM_OF_CITIES           4u
-#define WEATHER_DATA_SIZE       8u
+#define WEATHER_DATA_SIZE       10u
 
 typedef struct _city_info_s
 {
@@ -42,10 +42,13 @@ typedef struct _city_info_s
 } city_info_s;
 
 /*--Weather Data--*/
-char temp_normal[WEATHER_DATA_SIZE];
-char temp_real_feel[WEATHER_DATA_SIZE];
-char temp_minimum[WEATHER_DATA_SIZE];
-char temp_maximum[WEATHER_DATA_SIZE];
+char temp_normal[WEATHER_DATA_SIZE] = { 0 };        /*--degree celcius--*/
+char temp_real_feel[WEATHER_DATA_SIZE] = { 0 };     /*--degree celcius--*/
+char temp_minimum[WEATHER_DATA_SIZE] = { 0 };       /*--degree celcius--*/
+char temp_maximum[WEATHER_DATA_SIZE] = { 0 };       /*--degree celcius--*/
+char pressure[WEATHER_DATA_SIZE] = { 0 };           /*--Pascal--*/
+char humidity[WEATHER_DATA_SIZE] = { 0 };           /*--Percentage--*/
+char wind_speed[WEATHER_DATA_SIZE] = { 0 };         /*--meter/sec--*/
 
 /*--Total Number of cities--*/
 const city_info_s s_city_info[NUM_OF_CITIES] = 
@@ -82,6 +85,9 @@ uint8_t get_temperature( char *temp );
 uint8_t get_real_feel( char *temp );
 uint8_t get_min_temp( char *temp );
 uint8_t get_max_temp( char *temp );
+uint8_t get_pressure( char *temp );
+uint8_t get_humidity( char *temp );
+uint8_t get_wind_speed( char *temp );
 uint8_t get_weather_data( char *temp, const char *search_str );
 
 void flush_serial_data( void );
@@ -192,8 +198,9 @@ void loop(void)
     /*--Send GET Request and Receive Data--*/
     if( send_get_req( s_city_info[idx].city_name, 5000u ) == true )
     {
-      tft.println("City Name:" + s_city_info[idx].city_name);
-      
+      tft.fillRect(8, 8, tft.width(), 168, ILI9341_BLACK);
+      tft.println("City Name: " + s_city_info[idx].city_name);
+      /*---Temperature Data--*/
       tft.setCursor(8,40);
       snprintf( tft_buff_s, TFT_TXT_LEN, "Temp:%s C", temp_normal);
       tft.setCursor(8,56);
@@ -206,6 +213,18 @@ void loop(void)
       tft.println( tft_buff_s );
       snprintf( tft_buff_s, TFT_TXT_LEN, "Max.Temp:%s C", temp_maximum);
       tft.setCursor(8,104);
+      tft.println( tft_buff_s );
+      /*---Pressure Data--*/
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Pressure:%s Pa", pressure);
+      tft.setCursor(8,120);
+      tft.println( tft_buff_s );
+      /*---Humidity Data--*/
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Humidity:%s %%", humidity);
+      tft.setCursor(8,136);
+      tft.println( tft_buff_s );
+      /*---Wind Speed Data--*/
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Wind Speed:%s m/s", wind_speed);
+      tft.setCursor(8,152);
       tft.println( tft_buff_s );
     }
     delay(2000);
@@ -678,6 +697,18 @@ uint8_t check_get_req( uint32_t timeout )
   {
     status = get_max_temp( temp_maximum);
   }
+  if( status )
+  {
+    status = get_pressure( pressure );
+  }
+  if( status )
+  {
+    get_humidity( humidity );
+  }
+  if( status )
+  {
+    status = get_wind_speed( wind_speed );
+  }
   return status;
 }
 
@@ -685,6 +716,10 @@ const char temp_str[] = "temp";
 const char temp_real_feel_str[] = "feels_like";
 const char temp_min_str[] = "temp_min";
 const char temp_max_str[] = "temp_max";
+const char pressure_str[] = "pressure";
+const char humidity_str[] = "humidity";
+const char wind_speed_str[] = "speed";
+
 /**
  * @brief Get Normal Temperature
  * 
@@ -742,6 +777,47 @@ uint8_t get_max_temp( char *temp )
 }
 
 /**
+ * @brief Get Pressure
+ * 
+ * This function calls the get_weather_data function, with the relevant 
+ * buffer to be updated
+ * @param pointer to buffer
+ */
+uint8_t get_pressure( char *temp )
+{
+  uint8_t status = true;
+  status = get_weather_data( temp, pressure_str );
+  return status;
+}
+
+/**
+ * @brief Get Humidity
+ * 
+ * This function calls the get_weather_data function, with the relevant 
+ * buffer to be updated
+ * @param pointer to buffer
+ */
+uint8_t get_humidity( char *temp )
+{
+  uint8_t status = true;
+  status = get_weather_data( temp, humidity_str );
+  return status;
+}
+
+/**
+ * @brief Get Wind Speed
+ * 
+ * This function calls the get_weather_data function, with the relevant 
+ * buffer to be updated
+ * @param pointer to buffer
+ */
+uint8_t get_wind_speed( char *temp )
+{
+  uint8_t status = true;
+  status = get_weather_data( temp, wind_speed_str );
+  return status;
+}
+/**
  * @brief Get Weather Data
  * 
  * This function parse the weather_buff data based on the search string
@@ -769,7 +845,7 @@ uint8_t get_weather_data( char *temp, const char *search_str )
     pointer++;  // reached til colon :
     pointer++;  // now reached -minus
     idx = 0u;
-    while( *pointer != ',' && counter < SEARCH_COUNTER )
+    while( (*pointer != ',') && (*pointer != '}') && (counter < SEARCH_COUNTER) )
     {
       *(temp+idx) = *pointer;
       idx++;
