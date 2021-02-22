@@ -41,20 +41,11 @@ typedef struct _city_info_s
   uint8_t len;
 } city_info_s;
 
-/*--Weather Data Structure--*/
-typedef struct _Weather_Data_s
-{
-  uint8_t temp_normal[WEATHER_DATA_SIZE];
-  uint8_t temp_real_feel[WEATHER_DATA_SIZE];
-  uint8_t temp_minimum[WEATHER_DATA_SIZE];
-  uint8_t temp_maximum[WEATHER_DATA_SIZE];
-  int8_t temp_n;        // TODO: Future
-  int8_t temp_r_f;      // TODO: Future
-  int8_t temp_min;      // TODO: Future
-  int8_t temp_max;      // TODO: Future
-} Weather_Data_s;
-
-Weather_Data_s s_Weather_Data = { 0 };
+/*--Weather Data--*/
+char temp_normal[WEATHER_DATA_SIZE];
+char temp_real_feel[WEATHER_DATA_SIZE];
+char temp_minimum[WEATHER_DATA_SIZE];
+char temp_maximum[WEATHER_DATA_SIZE];
 
 /*--Total Number of cities--*/
 const city_info_s s_city_info[NUM_OF_CITIES] = 
@@ -86,6 +77,12 @@ uint8_t check_get_ip_mac_address( uint8_t ip, uint8_t mac, uint32_t timeout );
 uint8_t check_connect_cmd( uint32_t timeout );
 uint8_t check_for_num_of_bytes( uint32_t timeout );
 uint8_t check_get_req( uint32_t timeout );
+
+uint8_t get_temperature( char *temp );
+uint8_t get_real_feel( char *temp );
+uint8_t get_min_temp( char *temp );
+uint8_t get_max_temp( char *temp );
+uint8_t get_weather_data( char *temp, const char *search_str );
 
 void flush_serial_data( void );
 void flush_buffer( void );
@@ -175,17 +172,17 @@ void loop(void)
       tft.fillScreen(ILI9341_BLACK);
       tft.setCursor(0,231);
       tft.setTextSize(1);
-      tft.setTextColor(ILI9341_WHITE);
+      tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
       tft.println("Connection Status: FAIL   ");
     }
     tft.setCursor(0,231);
     tft.setTextSize(1);
-    tft.setTextColor(ILI9341_WHITE);
+    tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
     tft.println("Connection Status: PASS   ");
     
     tft.setTextSize(2);
     tft.setCursor(8,8);
-    tft.setTextColor(ILI9341_NAVY);
+    tft.setTextColor(ILI9341_GREEN, ILI9341_BLACK );
     delay(500);
     /*--Connection is OK, send Number of Bytes to Send--*/
     while( !send_num_of_bytes( s_city_info[idx].len, 3000) )
@@ -198,16 +195,16 @@ void loop(void)
       tft.println("City Name:" + s_city_info[idx].city_name);
       
       tft.setCursor(8,40);
-      snprintf( tft_buff_s, TFT_TXT_LEN, "Temp:%s C", (char*)s_Weather_Data.temp_normal);
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Temp:%s C", temp_normal);
       tft.setCursor(8,56);
       tft.println( tft_buff_s );
-      snprintf( tft_buff_s, TFT_TXT_LEN, "Real Feel:%s C", (char*)s_Weather_Data.temp_real_feel);
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Real Feel:%s C", temp_real_feel);
       tft.setCursor(8,72);
       tft.println( tft_buff_s );
-      snprintf( tft_buff_s, TFT_TXT_LEN, "Min.Temp:%s C", (char*)s_Weather_Data.temp_minimum);
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Min.Temp:%s C", temp_minimum);
       tft.setCursor(8,88);
       tft.println( tft_buff_s );
-      snprintf( tft_buff_s, TFT_TXT_LEN, "Max.Temp:%s C", (char*)s_Weather_Data.temp_maximum);
+      snprintf( tft_buff_s, TFT_TXT_LEN, "Max.Temp:%s C", temp_maximum);
       tft.setCursor(8,104);
       tft.println( tft_buff_s );
     }
@@ -637,10 +634,7 @@ uint8_t check_for_num_of_bytes( uint32_t timeout )
 uint8_t check_get_req( uint32_t timeout )
 {
   uint32_t timestamp;
-  uint8_t counter = 0u;
   uint8_t status = false;
-  uint8_t idx = 0u;
-  char *pointer;
   timestamp = millis();
   while( (millis() - timestamp <= timeout) && (status == false) )
   {
@@ -670,134 +664,123 @@ uint8_t check_get_req( uint32_t timeout )
   /*--parse data if status is true--*/
   if( status )
   {
-    /*--search for "temp", data is like "temp":-1.67--*/
-    pointer = strstr( (char*)weather_buff, "temp" );
-    while( *pointer != '\"' && counter < SEARCH_COUNTER )
+    status = get_temperature( temp_normal );
+  }
+  if( status )
+  {
+    status = get_real_feel( temp_real_feel );
+  }
+  if( status )
+  {
+    status = get_min_temp( temp_minimum );
+  }
+  if( status )
+  {
+    status = get_max_temp( temp_maximum);
+  }
+  return status;
+}
+
+const char temp_str[] = "temp";
+const char temp_real_feel_str[] = "feels_like";
+const char temp_min_str[] = "temp_min";
+const char temp_max_str[] = "temp_max";
+/**
+ * @brief Get Normal Temperature
+ * 
+ * This function calls the get_weather_data function, with the relevant 
+ * buffer to be updated
+ * @param pointer to buffer
+ */
+uint8_t get_temperature( char *temp )
+{
+  uint8_t status = true;
+  status = get_weather_data( temp, temp_str );
+  return status;
+}
+
+/**
+ * @brief Get Real Feel Temperature
+ * 
+ * This function calls the get_weather_data function, with the relevant 
+ * buffer to be updated
+ * @param pointer to buffer
+ */
+uint8_t get_real_feel( char *temp )
+{
+  uint8_t status = true;
+  status = get_weather_data( temp, temp_real_feel_str );
+  return status;
+}
+
+/**
+ * @brief Get Minimum Temperature
+ * 
+ * This function calls the get_weather_data function, with the relevant 
+ * buffer to be updated
+ * @param pointer to buffer
+ */
+uint8_t get_min_temp( char *temp )
+{
+  uint8_t status = true;
+  status = get_weather_data( temp, temp_min_str );
+  return status;
+}
+
+/**
+ * @brief Get Maximum Temperature
+ * 
+ * This function calls the get_weather_data function, with the relevant 
+ * buffer to be updated
+ * @param pointer to buffer
+ */
+uint8_t get_max_temp( char *temp )
+{
+  uint8_t status = true;
+  status = get_weather_data( temp, temp_max_str );
+  return status;
+}
+
+/**
+ * @brief Get Weather Data
+ * 
+ * This function parse the weather_buff data based on the search string
+ * and update the data into the buffers pointed by pointers
+ * @param pointer to buffer
+ */
+uint8_t get_weather_data( char *temp, const char *search_str )
+{
+  uint8_t idx = 0u;
+  uint8_t status = true;
+  uint8_t counter = 0u;
+  char *pointer;
+  /*--search for "temp", data is like "temp":-1.67--*/
+  pointer = strstr( (char*)weather_buff, search_str );
+  while( *pointer != '\"' && counter < SEARCH_COUNTER )
+  {
+    pointer++;
+    counter++;
+  }
+  /*--If found copy data into buffer--*/
+  if( counter < SEARCH_COUNTER )
+  {
+    counter = 0u;
+    /*--SW has found quote of "temp":-1.67, and now copy data till we get ,--*/
+    pointer++;  // reached til colon :
+    pointer++;  // now reached -minus
+    idx = 0u;
+    while( *pointer != ',' && counter < SEARCH_COUNTER )
     {
+      *(temp+idx) = *pointer;
+      idx++;
       pointer++;
       counter++;
     }
-    /*--If found copy data into buffer--*/
-    if( counter < SEARCH_COUNTER )
-    {
-      counter = 0u;
-      /*--SW has found quote of "temp":-1.67, and now copy data till we get ,--*/
-      pointer++;  // reached til colon :
-      pointer++;  // now reached -minus
-      idx = 0u;
-      while( *pointer != ',' && counter < SEARCH_COUNTER )
-      {
-        s_Weather_Data.temp_normal[idx] = *pointer;
-        idx++;
-        pointer++;
-        counter++;
-      }
-      s_Weather_Data.temp_normal[idx] = 0;    // Added NULL Character
-    }
-    else
-    {
-      status = false;
-    }
-    
-    /*--Search for Real Feel Temperature--*/
-    if( counter < SEARCH_COUNTER )
-    {
-      counter = 0u;
-      pointer = strstr( (char*)weather_buff, "feels_like" );
-      while( *pointer != '\"' && counter < SEARCH_COUNTER )
-      {
-        pointer++;
-        counter++;
-      }
-      /*--If found copy data into buffer--*/
-      if( counter < SEARCH_COUNTER )
-      {
-        counter = 0u;
-        /*--SW has found quote of feels_like":-1.67, and now copy data till we get ,--*/
-        pointer++;  // reached til colon :
-        pointer++;  // now reached -minus
-        idx = 0u;
-        while( *pointer != ',' && counter < SEARCH_COUNTER )
-        {
-          s_Weather_Data.temp_real_feel[idx] = *pointer;
-          idx++;
-          pointer++;
-          counter++;
-        }
-        s_Weather_Data.temp_real_feel[idx] = 0;    // Added NULL Character
-      }
-    }
-    else
-    {
-      status = false;
-    }
-    
-    /*--Search for Minimum Temperature--*/
-    if( counter < SEARCH_COUNTER )
-    {
-      counter = 0u;
-      pointer = strstr( (char*)weather_buff, "temp_min" );
-      while( *pointer != '\"' && counter < SEARCH_COUNTER )
-      {
-        pointer++;
-        counter++;
-      }
-      /*--If found copy data into buffer--*/
-      if( counter < SEARCH_COUNTER )
-      {
-        counter = 0u;
-        /*--SW has found quote of feels_like":-1.67, and now copy data till we get ,--*/
-        pointer++;  // reached til colon :
-        pointer++;  // now reached -minus
-        idx = 0u;
-        while( *pointer != ',' && counter < SEARCH_COUNTER )
-        {
-          s_Weather_Data.temp_minimum[idx] = *pointer;
-          idx++;
-          pointer++;
-          counter++;
-        }
-        s_Weather_Data.temp_minimum[idx] = 0;    // Added NULL Character
-      }
-    }
-    else
-    {
-      status = false;
-    }
-    
-    /*--Search for Maximum Temperature--*/
-    if( counter < SEARCH_COUNTER )
-    {
-      counter = 0u;
-      pointer = strstr( (char*)weather_buff, "temp_max" );
-      while( *pointer != '\"' && counter < SEARCH_COUNTER )
-      {
-        pointer++;
-        counter++;
-      }
-      /*--If found copy data into buffer--*/
-      if( counter < SEARCH_COUNTER )
-      {
-        counter = 0u;
-        /*--SW has found quote of feels_like":-1.67, and now copy data till we get ,--*/
-        pointer++;  // reached til colon :
-        pointer++;  // now reached -minus
-        idx = 0u;
-        while( *pointer != ',' && counter < SEARCH_COUNTER )
-        {
-          s_Weather_Data.temp_maximum[idx] = *pointer;
-          idx++;
-          pointer++;
-          counter++;
-        }
-        s_Weather_Data.temp_maximum[idx] = 0;    // Added NULL Character
-      }
-    }
-    else
-    {
-      status = false;
-    }
-    
+    *(temp+idx) = 0;    // Added NULL Character
+  }
+  else
+  {
+    status = false;
   }
   return status;
 }
@@ -838,18 +821,21 @@ void flush_serial_data( void )
   }
 }
 
-/**
- * @brief Display Progress Bar at Bottom
- * 
- * This function flushes the Serial Data from the internal buffers
- */
 const uint16_t p_x = 0;
 const uint16_t p_y = 221;
 const uint16_t p_w = 320;
 const uint16_t p_h = 16;
+/**
+ * @brief Display Progress Bar at Bottom
+ * 
+ * This function dispays a progress bar based on the percentage input
+ * @param percentage of progress
+ */
 void progress_bar( uint8_t percentage )
 {
   uint16_t progress = 0;
+  if( percentage > 100u )
+    percentage = 100u;
   progress = (uint16_t)((320 * (uint16_t)percentage)/100);
   tft.drawRect(p_x, p_y, p_w, p_h, ILI9341_CYAN);
   tft.fillRect(p_x, p_y, progress, p_h, ILI9341_DARKCYAN);
